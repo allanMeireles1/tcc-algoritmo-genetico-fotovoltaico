@@ -1,0 +1,19 @@
+{
+  "city": "João Pessoa",
+  "source": "Mock inspirado em médias públicas INPE/SONDA",
+  "monthly_kwh_m2_day": {
+    "jan": 5.7,
+    "feb": 5.8,
+    "mar": 5.6,
+    "apr": 5.3,
+    "may": 5.1,
+    "jun": 4.9,
+    "jul": 5.0,
+    "aug": 5.2,
+    "sep": 5.4,
+    "oct": 5.6,
+    "nov": 5.7,
+    "dec": 5.8
+  },
+  "annual_mean_kwh_m2_day": 5.425
+}

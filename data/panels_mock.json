@@ -1,0 +1,10 @@
+[
+  {
+    "panel_model": "STD-550W",
+    "panel_power_wp": 550.0,
+    "panel_area_m2": 2.2,
+    "panel_cost_brl": 1100.0,
+    "installation_cost_per_panel_brl": 250.0,
+    "system_efficiency": 0.82
+  }
+]

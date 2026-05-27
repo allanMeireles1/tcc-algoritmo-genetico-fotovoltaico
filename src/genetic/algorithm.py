@@ -1,104 +1,60 @@
+"""Laço principal do algoritmo genético."""
 
-import random
-
-from genetic.individual import Individual
-from genetic.fitness import calculate_fitness
-from genetic.operators import crossover, mutate
-
-from core.config import (
-    POPULATION_SIZE,
-    GENERATIONS,
-    MIN_PANELS,
-    MAX_PANELS
-)
+from src.core.config import GAConfig
+from src.genetic.fitness import evaluate_fitness
+from src.genetic.operators import crossover, initialize_population, mutate
+from src.genetic.selection import tournament_selection
+from src.models.individual import Individual
+from src.models.result import GenerationStats
 
 
-class GeneticAlgorithm:
+def max_panels_by_roof(roof_usable_area_m2: float, panel_area_m2: float) -> int:
+    """Deriva quantidade máxima de painéis pela área disponível."""
+    return max(1, int(roof_usable_area_m2 // panel_area_m2))
 
-    def __init__(
-        self,
-        consumption: float,
-        irradiation: float
-    ):
 
-        self.consumption = consumption
-        self.irradiation = irradiation
+def _evaluate_population(population: list[Individual], scenario: dict, config: GAConfig) -> None:
+    for individual in population:
+        individual.fitness, _, _ = evaluate_fitness(individual.num_panels, scenario, config)
 
-        self.history = []
-        self.best_individual = None
 
-    def generate_population(self):
+def run_genetic_algorithm(scenario: dict, config: GAConfig) -> tuple[Individual, list[GenerationStats]]:
+    """Executa o AG e retorna melhor indivíduo e histórico por geração."""
+    min_panels = 0
+    max_panels = max_panels_by_roof(
+        roof_usable_area_m2=float(scenario["roof_usable_area_m2"]),
+        panel_area_m2=float(scenario["panel_area_m2"]),
+    )
+    population = initialize_population(config.population_size, min_panels, max_panels)
 
-        population = []
+    history: list[GenerationStats] = []
+    _evaluate_population(population, scenario, config)
 
-        for _ in range(POPULATION_SIZE):
+    for generation in range(config.generations):
+        population.sort(key=lambda ind: ind.fitness, reverse=True)
+        elites = [Individual(num_panels=ind.num_panels, fitness=ind.fitness) for ind in population[: config.elitism_count]]
 
-            panels = random.randint(
-                MIN_PANELS,
-                MAX_PANELS
+        new_population: list[Individual] = elites
+        while len(new_population) < config.population_size:
+            parent_a = tournament_selection(population)
+            parent_b = tournament_selection(population)
+            child_a, child_b = crossover(parent_a, parent_b, config.crossover_rate)
+            mutate(child_a, config.mutation_rate, min_panels, max_panels)
+            mutate(child_b, config.mutation_rate, min_panels, max_panels)
+            new_population.extend([child_a, child_b])
+
+        population = new_population[: config.population_size]
+        _evaluate_population(population, scenario, config)
+        best = max(population, key=lambda ind: ind.fitness)
+        avg = sum(ind.fitness for ind in population) / len(population)
+        history.append(
+            GenerationStats(
+                generation=generation,
+                best_fitness=best.fitness,
+                avg_fitness=avg,
+                best_panels=best.num_panels,
             )
-
-            population.append(
-                Individual(panels)
-            )
-
-        return population
-
-    def evaluate_population(self, population):
-
-        for individual in population:
-
-            individual.fitness = calculate_fitness(
-                individual.number_of_panels,
-                self.consumption,
-                self.irradiation
-            )
-
-    def select_best(self, population):
-
-        population.sort(
-            key=lambda x: x.fitness,
-            reverse=True
         )
 
-        return population[:2]
-
-    def execute(self):
-
-        population = self.generate_population()
-
-        for generation in range(GENERATIONS):
-
-            self.evaluate_population(population)
-
-            best_two = self.select_best(population)
-
-            best_score = best_two[0].fitness
-
-            self.history.append(best_score)
-
-            new_population = best_two.copy()
-
-            while len(new_population) < POPULATION_SIZE:
-
-                child_panels = crossover(
-                    best_two[0].number_of_panels,
-                    best_two[1].number_of_panels
-                )
-
-                child_panels = mutate(child_panels)
-
-                new_population.append(
-                    Individual(child_panels)
-                )
-
-            population = new_population
-
-        self.evaluate_population(population)
-
-        self.best_individual = max(
-            population,
-            key=lambda x: x.fitness
-        )
-
-        return self.best_individual
+    best_overall = max(population, key=lambda ind: ind.fitness)
+    return best_overall, history

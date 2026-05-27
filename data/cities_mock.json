@@ -1,0 +1,8 @@
+[
+  {"city": "João Pessoa", "state": "PB", "irradiance_kwh_m2_day": 5.4},
+  {"city": "Recife", "state": "PE", "irradiance_kwh_m2_day": 5.2},
+  {"city": "Natal", "state": "RN", "irradiance_kwh_m2_day": 5.6},
+  {"city": "Fortaleza", "state": "CE", "irradiance_kwh_m2_day": 5.7},
+  {"city": "Maceió", "state": "AL", "irradiance_kwh_m2_day": 5.3},
+  {"city": "Salvador", "state": "BA", "irradiance_kwh_m2_day": 5.1}
+]
