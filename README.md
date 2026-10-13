@@ -36,10 +36,79 @@ project/
 
 ## Como executar
 
+### Interface Streamlit (protótipo atual)
+
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
 ```
+
+### API FastAPI (backend)
+
+```bash
+pip install -r requirements.txt
+uvicorn backend.app:app --reload --port 8000
+```
+
+A documentação interativa (Swagger) fica em `http://localhost:8000/docs`.
+
+### Testes
+
+```bash
+pip install pytest pytest-cov
+pytest tests/ -v
+```
+
+## Estrutura do backend
+
+```text
+backend/
+├── __init__.py
+├── app.py        # instância FastAPI + CORS
+├── routes.py     # endpoints (sem lógica de negócio)
+├── services.py   # adaptadores que chamam src/* e retornam DTOs
+└── schemas.py    # modelos Pydantic (request/response)
+```
+
+## Endpoints da API
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `GET`  | `/health` | Verificação de saúde |
+| `GET`  | `/cities` | Lista cidades disponíveis |
+| `GET`  | `/panels` | Lista painéis configurados |
+| `POST` | `/optimize` | Executa otimização completa (AG) |
+| `POST` | `/baseline` | Calcula dimensionamento direto |
+| `POST` | `/experiments/sensitivity` | Sensibilidade ao consumo |
+| `POST` | `/experiments/population-timing` | Tempo × tamanho da população |
+| `POST` | `/experiments/generations-timing` | Tempo × número de gerações |
+
+### Exemplo de requisição `/optimize`
+
+```json
+{
+  "roof": {
+    "width_m": 8.0,
+    "length_m": 10.0,
+    "monthly_consumption_kwh": 300.0,
+    "city": "João Pessoa",
+    "roof_type": "ceramic",
+    "max_budget_brl": null
+  },
+  "config": {
+    "population_size": 50,
+    "generations": 100,
+    "crossover_rate": 0.8,
+    "mutation_rate": 0.1,
+    "elitism_count": 2,
+    "random_seed": 42
+  },
+  "runs": 1
+}
+```
+
+A resposta espelha a estrutura `OptimizationOutcome` do protótipo original
+(`result`, `history`, `summary`, `final_population`, `fitness_breakdown`).
 
 ## O que a interface permite
 
@@ -49,8 +118,27 @@ streamlit run app.py
 - definir orçamento máximo opcional;
 - configurar seed e parâmetros do AG;
 - comparar AG com baseline direto;
-- visualizar convergência, fitness, custo e ocupação do telhado;
 - exportar resultados em JSON/CSV.
+
+## Gráficos acadêmicos (abas)
+
+**Dashboard principal**
+
+1. Evolução do fitness (convergência)
+2. Melhor fitness vs fitness médio
+3. Energia gerada × consumo
+4. Ocupação do telhado (m²) + layout esquemático
+
+**Análise do AG**
+
+5. AG × método direto (painéis e custo)
+6. Histograma da população final
+7. Composição da função de fitness
+
+**Experimentos**
+
+8. Sensibilidade ao consumo
+9. Tempo de execução × população / gerações
 
 ## Dados mockados
 

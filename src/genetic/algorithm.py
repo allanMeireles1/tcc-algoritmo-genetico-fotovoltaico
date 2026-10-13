@@ -18,8 +18,11 @@ def _evaluate_population(population: list[Individual], scenario: dict, config: G
         individual.fitness, _, _ = evaluate_fitness(individual.num_panels, scenario, config)
 
 
-def run_genetic_algorithm(scenario: dict, config: GAConfig) -> tuple[Individual, list[GenerationStats]]:
-    """Executa o AG e retorna melhor indivíduo e histórico por geração."""
+def run_genetic_algorithm(
+    scenario: dict,
+    config: GAConfig,
+) -> tuple[Individual, list[GenerationStats], list[Individual]]:
+    """Executa o AG e retorna melhor indivíduo, histórico e população final."""
     min_panels = 0
     max_panels = max_panels_by_roof(
         roof_usable_area_m2=float(scenario["roof_usable_area_m2"]),
@@ -57,4 +60,7 @@ def run_genetic_algorithm(scenario: dict, config: GAConfig) -> tuple[Individual,
         )
 
     best_overall = max(population, key=lambda ind: ind.fitness)
-    return best_overall, history
+    final_population = [
+        Individual(num_panels=ind.num_panels, fitness=ind.fitness) for ind in population
+    ]
+    return best_overall, history, final_population

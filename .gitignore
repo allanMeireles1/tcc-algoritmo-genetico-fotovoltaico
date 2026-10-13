@@ -3,3 +3,9 @@ __pycache__/
 *.pyc
 results/
 .env
+backend.log
+backend_err.log
+program.zip
+frontend/node_modules/
+backend/node_modules/
+.venv312/

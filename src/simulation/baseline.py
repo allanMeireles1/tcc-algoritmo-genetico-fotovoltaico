@@ -23,8 +23,8 @@ def direct_sizing_panels(problem: dict) -> int:
     return min(estimated, max_by_area)
 
 
-def evaluate_direct_baseline(problem: dict, config: GAConfig) -> tuple[int, float]:
-    """Avalia o baseline com a mesma função de fitness do AG."""
+def evaluate_direct_baseline(problem: dict, config: GAConfig) -> tuple[int, float, float, float]:
+    """Avalia baseline: painéis, fitness, energia e custo."""
     panels = direct_sizing_panels(problem)
-    fitness, _, _ = evaluate_fitness(panels, problem, config)
-    return panels, fitness
+    fitness, energy, cost = evaluate_fitness(panels, problem, config)
+    return panels, fitness, energy, cost
