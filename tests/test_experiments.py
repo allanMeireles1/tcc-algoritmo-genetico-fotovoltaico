@@ -10,7 +10,12 @@ from src.models.result import SensitivityPoint, TimingPoint
 from src.models.roof import RoofInput
 from src.simulation.experiments import (
     run_consumption_sensitivity,
+    run_crossover_rate_sensitivity,
+    run_elitism_sensitivity,
+    run_generations_sensitivity,
     run_generations_timing_experiment,
+    run_mutation_rate_sensitivity,
+    run_population_sensitivity,
     run_population_timing_experiment,
 )
 from src.storage.loader import load_cities, load_panels

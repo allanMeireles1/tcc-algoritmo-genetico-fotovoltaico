@@ -8,11 +8,13 @@ from fastapi import APIRouter, HTTPException
 from backend.schemas import (
     OptimizeRequest,
     BaselineRequest,
+    ComparisonRequest,
     SensitivityRequest,
     PopulationTimingRequest,
     GenerationsTimingRequest,
     OptimizeResponse,
     BaselineResponse,
+    ComparisonResponse,
     SensitivityPointDTO,
     TimingPointDTO,
 )
@@ -42,6 +44,8 @@ def list_panels():
 # ---------------------------------------------------------------------------
 # 1. Optimisation (full AG run)
 # ---------------------------------------------------------------------------
+# 6. Comparison (AG + analytical + exhaustive) – new endpoint
+# ---------------------------------------------------------------------------
 @router.post("/optimize", response_model=OptimizeResponse)
 def api_optimize(req: OptimizeRequest):
     try:
@@ -59,6 +63,19 @@ def api_optimize(req: OptimizeRequest):
 def api_baseline(req: BaselineRequest):
     try:
         return services.baseline_adapter(req)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
+# 2.5 Comparison – AG vs analytical vs exhaustive (new)
+# ---------------------------------------------------------------------------
+@router.post("/compare", response_model=ComparisonResponse)
+def api_compare(req: ComparisonRequest):
+    try:
+        return services.comparison_adapter(req)
     except HTTPException:
         raise
     except Exception as exc:

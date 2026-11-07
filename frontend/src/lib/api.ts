@@ -16,6 +16,12 @@ export async function getPanels(): Promise<Record<string, unknown>[]> {
   return res.json();
 }
 
+export async function getHealth(): Promise<Record<string, unknown>> {
+  const res = await fetch(buildUrl("/health"));
+  if (!res.ok) throw new Error(`GET /health failed: ${res.status}`);
+  return res.json();
+}
+
 export async function optimize(payload: {
   roof: {
     width_m: number;
@@ -77,5 +83,29 @@ export async function generationsTiming(payload: unknown) {
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(`generations-timing failed: ${res.status}`);
+  return res.json();
+}
+
+export async function compare(payload: {
+  roof: {
+    width_m: number;
+    length_m: number;
+    monthly_consumption_kwh: number;
+    city: string;
+    roof_type: string;
+    max_budget_brl: number | null;
+  };
+  config: unknown;
+  runs: number;
+}) {
+  const res = await fetch(buildUrl("/compare"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(body || `compare failed: ${res.status}`);
+  }
   return res.json();
 }

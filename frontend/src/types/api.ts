@@ -94,3 +94,35 @@ export interface TimingPointDTO {
   execution_time_s: number;
   best_panels: number;
 }
+
+export interface EvaluationResultDTO {
+  num_panels: number;
+  feasible: boolean;
+  cost: number;
+  violation: number;
+  energy_violation: number;
+  area_violation: number;
+  budget_violation: number;
+  energy_by_month: Record<string, number>;
+  used_area: number;
+  occupancy: number;
+}
+
+export interface MethodResultDTO {
+  method: string;
+  run_index: number;
+  run_seed: number | null;
+  execution_time_s: number;
+  evaluation: EvaluationResultDTO;
+}
+
+export interface ComparisonHistoryDTO {
+  seed: number;
+  generations: GenerationStatsDTO[];
+}
+
+export interface ComparisonResponse {
+  summary: Record<string, unknown>;
+  results: MethodResultDTO[];
+  histories: ComparisonHistoryDTO[];
+}

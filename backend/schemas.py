@@ -62,6 +62,12 @@ class BaselineRequest(BaseModel):
     roof: RoofDTO
 
 
+class ComparisonRequest(BaseModel):
+    roof: RoofDTO
+    config: GAConfigDTO = Field(default_factory=GAConfigDTO)
+    runs: int = Field(default=1, ge=1, le=100)
+
+
 class SensitivityRequest(BaseModel):
     roof: RoofDTO
     consumption_levels: List[float] = Field(..., min_length=1)
@@ -152,6 +158,12 @@ class BaselineResponse(BaseModel):
     fitness: float
     energy_kwh_month: float
     cost_brl: float
+
+
+class ComparisonResponse(BaseModel):
+    summary: dict
+    results: list[dict]
+    histories: list[dict] = []
 
 
 # Alias for readability in routes

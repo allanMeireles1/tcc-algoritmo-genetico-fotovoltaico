@@ -19,6 +19,7 @@ import {
 import { DashboardPage } from "./components/DashboardPage";
 import { AnalysisPage } from "./components/AnalysisPage";
 import { ExperimentsPage } from "./components/ExperimentsPage";
+import { ComparisonPage } from "./components/ComparisonPage";
 import { MetricCards } from "./components/MetricCards";
 import { RoofSketch } from "./components/RoofSketch";
 import { EmptyState } from "./components/EmptyState";
@@ -27,12 +28,14 @@ import { SymptomBanner } from "./components/SymptomBanner";
 import type {
   OptimizationOutcomeDTO,
   BaselineResponse,
+  GAConfigDTO,
   SensitivityPointDTO,
   TimingPointDTO,
 } from "./types/api";
 import {
   getCities,
   getPanels,
+  getHealth,
   optimize,
   baseline,
   sensitivity,
@@ -40,18 +43,20 @@ import {
   generationsTiming,
 } from "./lib/api";
 
-type TabKey = "dashboard" | "analysis" | "experiments";
+type TabKey = "dashboard" | "analysis" | "experiments" | "compare";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "dashboard", label: "Dashboard principal" },
   { key: "analysis", label: "Análise do AG" },
   { key: "experiments", label: "Experimentos" },
+  { key: "compare", label: "Comparação" },
 ];
 
 export function App() {
   // reference catalogues -------------------------------------------------
   const [cities, setCities] = useState<string[]>([]);
   const [panels, setPanels] = useState<Record<string, unknown>[]>([]);
+  const [apiOnline, setApiOnline] = useState<boolean | null>(null);
 
   useEffect(() => {
     getCities()
@@ -60,6 +65,9 @@ export function App() {
     getPanels()
       .then(setPanels)
       .catch(() => setPanels([]));
+    getHealth()
+      .then(() => setApiOnline(true))
+      .catch(() => setApiOnline(false));
   }, []);
 
   // inputs ---------------------------------------------------------------
@@ -183,6 +191,10 @@ export function App() {
   const result = outcome?.result;
   const roofLabel = `${(roof.length_m * panelArea).toFixed(1)}m×${roof.width_m.toFixed(1)}m`;
   const areaLabel = `Área útil ~${summary.usable.toFixed(1)}m² (~${summary.maxPanels} painéis)`;
+  const apiStatusClass = apiOnline
+    ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+    : 'bg-rose-50 text-rose-700 ring-rose-200';
+  const apiDotClass = apiOnline ? 'bg-emerald-500' : 'bg-rose-500';
 
   // UI -------------------------------------------------------------------
   return (
@@ -205,10 +217,12 @@ export function App() {
             </div>
           </div>
           <div className="hidden items-center gap-2 sm:flex">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              API online
-            </span>
+            {apiOnline !== null && (
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 ring-inset ${apiStatusClass}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${apiDotClass}`} />
+                {apiOnline ? 'API online' : 'API offline'}
+              </span>
+            )}
           </div>
         </div>
       </header>
@@ -326,6 +340,10 @@ export function App() {
             panelArea={panelArea}
             numPanels={result?.best_num_panels ?? 0}
           />
+
+          {activeTab === "compare" && (
+            <ComparisonPage roof={payload.roof} config={payload.config as GAConfigDTO} />
+          )}
 
           {phase === "idle" && !outcome && (
             <EmptyState onRun={runOptimization} busy={busy} />

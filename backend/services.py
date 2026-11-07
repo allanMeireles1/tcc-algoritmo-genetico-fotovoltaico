@@ -19,7 +19,7 @@ from src.models.result import (
     TimingPoint,
 )
 from src.storage.loader import load_cities, load_panels
-from src.simulation.runner import run_optimization, build_problem
+from src.simulation.runner import run_optimization, build_problem, run_comparison, comparison_to_rows
 from src.simulation.baseline import evaluate_direct_baseline
 from src.simulation.experiments import (
     run_consumption_sensitivity,
@@ -30,6 +30,7 @@ from src.simulation.experiments import (
 from backend.schemas import (
     OptimizeRequest,
     BaselineRequest,
+    ComparisonRequest,
     SensitivityRequest,
     PopulationTimingRequest,
     GenerationsTimingRequest,
@@ -37,9 +38,10 @@ from backend.schemas import (
     ScenarioRunResultDTO,
     OptimizationOutcomeDTO,
     FitnessBreakdownDTO,
+    BaselineResponse,
+    ComparisonResponse,
     SensitivityPointDTO,
     TimingPointDTO,
-    BaselineResponse,
 )
 
 
@@ -97,6 +99,32 @@ def optimize_adapter(req: OptimizeRequest) -> OptimizationOutcomeDTO:
     )
     # Map dataclass -> DTO
     return _outcome_to_dto(outcome)
+
+
+def comparison_adapter(req: ComparisonRequest) -> ComparisonResponse:
+    """Wraps ``run_comparison`` so the API exposes the full scientific comparison.
+
+    Delegates to ``src.simulation.runner.run_comparison`` (E5.3.4/E5.4) without
+    touching the legacy ``/optimize`` flow.
+    """
+    city_data = city_lookup(req.roof.city)
+    panel_data = panel_default()
+    ga_cfg: GAConfig = req.config.to_ga_config()
+    outcome = run_comparison(
+        roof=req.roof.to_roof_input(),
+        city_data=city_data,
+        panel_data=panel_data,
+        config=ga_cfg,
+        runs=req.runs,
+    )
+    return ComparisonResponse(
+        summary=outcome.summary,
+        results=comparison_to_rows(outcome),
+        histories=[
+            {"seed": seed, "generations": [asdict(h) for h in history]}
+            for seed, history in outcome.genetic_histories.items()
+        ],
+    )
 
 
 def _outcome_to_dto(m: OptimizationOutcome) -> OptimizationOutcomeDTO:

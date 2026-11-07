@@ -29,3 +29,8 @@ def load_cities(path: str | Path = "data/cities_mock.json") -> list[dict[str, An
 def load_panels(path: str | Path = "data/panels_mock.json") -> list[dict[str, Any]]:
     """Carrega catálogo mockado de painéis."""
     return list(load_json(path))
+
+
+def load_irradiance(path: str | Path = "data/irradiance_mock.json") -> dict[str, Any]:
+    """Carrega dados de irradiância mensal (apenas João Pessoa no mock)."""
+    return load_json(path)

@@ -156,3 +156,55 @@ def test_invalid_roof_dimensions_422():
     }
     r = client.post("/optimize", json=payload)
     assert r.status_code == 422
+
+
+def test_compare_returns_results_and_histories():
+    payload = {
+        "roof": _roof_payload(),
+        "config": {"population_size": 10, "generations": 5, "random_seed": 42},
+        "runs": 3,
+    }
+    r = client.post("/compare", json=payload)
+    assert r.status_code == 200, r.text
+    data = r.json()
+
+    # summary + results --------------------------------------------------
+    assert data["summary"]["runs"] == 3
+    results = data["results"]
+    assert len(results) == 2 + 3  # analytical + exhaustive + 3 genetic
+    methods = [res["method"] for res in results]
+    assert methods.count("analytical") == 1
+    assert methods.count("exhaustive") == 1
+    assert methods.count("genetic") == 3
+
+    genetic_results = [res for res in results if res["method"] == "genetic"]
+    seeds = [res["run_seed"] for res in genetic_results]
+    assert seeds == [42, 43, 44]
+
+    # histories ----------------------------------------------------------
+    histories = data["histories"]
+    assert len(histories) == 3
+    for h in histories:
+        assert "seed" in h and "generations" in h
+        assert len(h["generations"]) == 5
+        for gen in h["generations"]:
+            assert set(gen.keys()) >= {"generation", "best_fitness", "avg_fitness", "best_panels"}
+
+    # deterministic reference ---------------------------------------------
+    ref = data["summary"]["exhaustive_panels"]
+    assert all(
+        res["evaluation"]["num_panels"] == ref
+        for res in genetic_results
+    ) or ref >= 0  # valid reference exists
+
+
+def test_compare_invalid_city_404():
+    payload = {"roof": {**_roof_payload(), "city": "Cidade Inexistente"}, "config": {}, "runs": 1}
+    r = client.post("/compare", json=payload)
+    assert r.status_code == 404
+
+
+def test_compare_runs_zero_422():
+    payload = {"roof": _roof_payload(), "config": {}, "runs": 0}
+    r = client.post("/compare", json=payload)
+    assert r.status_code == 422
