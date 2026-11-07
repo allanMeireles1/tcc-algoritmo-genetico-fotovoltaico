@@ -1,442 +1,353 @@
-# Aplicação de Algoritmos Genéticos no Dimensionamento Fotovoltaico (MVP TCC)
+# Dimensionamento Fotovoltaico Residencial com Algoritmos Genéticos — TCC
 
-Aplicação acadêmica para otimizar a quantidade de painéis solares em residências do Nordeste, com entrada realista de telhado e consumo. O sistema atual combina um back‑end FastAPI com um front‑end React/Vite; o protótipo original em Streamlit (`app.py`) é mantido apenas como referência histórica.
+Aplicação acadêmica desenvolvida para o TCC de Ciência da Computação. O sistema usa um **Algoritmo Genético (AG)** para determinar a quantidade de módulos fotovoltaicos que **minimiza o custo estimado de aquisição e instalação**, sujeita ao atendimento do consumo mensal da residência, à área útil do telhado e, quando informado, ao orçamento máximo.
 
-## Objetivo
+> **Importante:** este é um protótipo acadêmico. Os dados de irradiação são **simulados (mock)** e os resultados não substituem um projeto fotovoltaico executado por profissional habilitado.
 
-Resolver, via algoritmo genético manual, o problema:
+---
 
-- entrada: largura e comprimento do telhado, consumo mensal, cidade, orçamento opcional;
-- saída: melhor número de painéis, energia estimada, custo, ocupação e déficit/excesso energético.
+## 1. O que é o projeto
 
-Foco: otimização heurística e simulação computacional para TCC de Ciência da Computação.
+O sistema calcula uma configuração de painéis solares para uma residência a partir de:
 
-## Estrutura
+- largura e comprimento do telhado;
+- consumo mensal de energia (kWh);
+- cidade de referência;
+- orçamento máximo opcional;
+- parâmetros do Algoritmo Genético (população, gerações, crossover, mutação, elitismo e seed).
+
+A saída apresenta:
+
+- quantidade recomendada de painéis;
+- energia estimada gerada por mês;
+- custo estimado dos módulos;
+- ocupação da área útil do telhado;
+- déficit ou excedente energético;
+- comparação entre AG, solução analítica e busca exaustiva;
+- gráficos e tabelas para análise.
+
+### Modelo matemático adotado
+
+A única variável de decisão é **N** (quantidade inteira de módulos). O objetivo é:
+
+> minimizar o custo de aquisição e instalação dos módulos, sujeito à cobertura do consumo mensal em todos os meses, à área útil do telhado e ao orçamento opcional.
+
+A geração mensal estimada é calculada por:
+
+\[
+E_m(N)=N\cdot\frac{P_{\text{módulo}}}{1000}\cdot HSP_m\cdot30\cdot\eta
+\]
+
+em que `P_módulo` é a potência do módulo (Wp), `HSP_m` são as horas de sol pleno por dia, `30` é a aproximação de dias no mês e `η` é a eficiência global.
+
+A avaliação das soluções usa **comparação lexicográfica feasibility-first** (AG v2), e **não** uma função fitness escalar `Eg − Ct`.
+
+---
+
+## 2. O que já está implementado
+
+- **Backend:** Python + FastAPI, com endpoints para cidades, painéis, otimização, baseline, comparação e experimentos.
+- **Frontend:** React + Vite (TypeScript), com dashboard, análise do AG, experimentos e comparação.
+- **AG v2:** seleção por torneio lexicográfico, elitismo, crossover e mutação, com avaliação lexicográfica feasibility-first.
+- **Modelo E5.2:** minimização de custo com restrições; única variável de decisão `N`.
+- **Experimentos oficiais:** 3 cenários de consumo (150, 300 e 500 kWh/mês) × 2 configurações de AG (pop10/gen20 e pop20/gen40) × 30 sementes = **180 execuções**.
+- **Resultados:** o AG encontrou o ótimo determinístico em **180/180 execuções**; os métodos analítico e exaustivo foram mais rápidos.
+- **Validação de software:** **208/208 testes aprovados**.
+- **Documentação:** auditoria do artigo, guia editorial, modelo matemático e encerramento técnico na pasta `docs/`.
+
+> A distinção é importante: **180 experimentos** são resultados científicos; **208 testes** são evidência de validação de software. Os dois números aparecem em contextos diferentes.
+
+---
+
+## 3. Arquitetura
 
 ```text
-project/
-├── app.py
-├── README.md
-├── requirements.txt
-├── data/
-│   ├── cities_mock.json
-│   ├── panels_mock.json
-│   └── scenarios_mock.json
-├── results/
-├── assets/
-└── src/
-    ├── core/
-    ├── models/
-    ├── genetic/
-    ├── simulation/
-    ├── visualization/
-    ├── storage/
-    └── utils/
+┌─────────────────────────────┐
+│  Frontend React + Vite      │
+│  http://localhost:5173      │
+└──────────────┬──────────────┘
+               │ HTTP (JSON)
+               │ /api/*
+┌──────────────▼──────────────┐
+│  Backend FastAPI            │
+│  http://localhost:8000      │
+└──────────────┬──────────────┘
+               │
+┌──────────────▼──────────────┐
+│  Núcleo científico em Python│
+│  src/genetic, src/simulation│
+│  src/models, src/core       │
+└─────────────────────────────┘
 ```
 
-## Como executar
+O frontend chama `/api/*`; o servidor de desenvolvimento do Vite redireciona essas chamadas para `http://localhost:8000`.
 
-### Fluxo experimental (E5.4)
+---
 
-O fluxo experimental permite comparar **três** abordagens usando o mesmo problema:
+## 4. Requisitos para rodar no PC do colega
 
-- **Solução analítica** – cálculo direto do número ótimo de painéis (E5.3.2).  
-- **Busca exaustiva** – avaliação de todos os valores de \(N\) dentro do limite (E5.3.2).  
-- **Algoritmo genético v2** – algoritmo evolutivo que utiliza a avaliação e comparação lexicográfica (E5.3.4).
+Instale antes:
 
-A API Python está disponível em `src/simulation/runner.py`:
-
-```python
-from src.core.config import GAConfig
-from src.models.roof import RoofInput
-from src.simulation.runner import run_comparison
-
-roof = RoofInput(
-    width_m=8.0,
-    length_m=10.0,
-    monthly_consumption_kwh=300.0,
-    city="João Pessoa",
-    max_budget_brl=None,
-)
-config = GAConfig(
-    population_size=20,
-    generations=10,
-    crossover_rate=0.8,
-    mutation_rate=0.2,
-    elitism_count=2,
-    random_seed=42,
-)
-
-# Executa a comparação (por padrão 1 run do AG)
-outcome = run_comparison(
-    roof=roof,
-    city_data={"city": "João Pessoa", "irradiance_kwh_m2_day": 5.4},
-    panel_data={
-        "panel_power_wp": 550,
-        "panel_cost_brl": 1350,
-        "installation_cost_per_panel_brl": 0,
-        "panel_area_m2": 2.2,
-        "system_efficiency": 0.82,
-    },
-    config=config,
-    runs=3,  # múltiplas sementes para o AG
-)
-```
-
-`run_comparison` devolve um objeto **`ComparisonOutcome`** contendo:
-
-- `execution_label` e `city`
-- o `Problem` usado (garante que os três métodos operarão sobre exatamente os mesmos parâmetros)
-- `results`: lista de `MethodResult` (método, seed, tempo, avaliação completa)
-- `config` (cópia dos parâmetros do GA)
-- `analytical_diagnostic` (valores de N = energia, área, orçamento, etc.)
-- `summary` com métricas agregadas (ex.: tempos médios, coincidência de painéis entre analítico e exaustivo, painel por seed).
-
-Para exportar os resultados em forma tabular (CSV/Excel) basta usar:
-
-```python
-from src.simulation.runner import comparison_to_rows
-rows = comparison_to_rows(outcome)
-# rows é uma lista de dicionários – pode ser salva com pandas ou csv
-```
-
-O fluxo **legado** (`run_optimization`) permanece inalterado e continua a ser usado pelos serviços da API (`/optimize`). O novo fluxo é independente e pode ser usado para experimentos científicos, estudos de sensibilidade e benchmarking.
-
-#### Convergência (E5.4.3)
-
-`run_comparison` agora preenche `convergence` (métricas por seed) e
-`convergence_summary` (agregado) em `ComparisonOutcome`. Para analisar a evolução
-geração a geração:
-
-```bash
-python convergence_experiment.py
-```
-
-Métricas por execução (`ConvergenceMetrics`):
-
-| Campo | Significado |
-|---|---|
-| `best_panels_trajectory` | melhor número de painéis por geração |
-| `converged` | melhor estável nas últimas 5 gerações |
-| `convergence_generation` | 1ª geração a partir da qual o melhor não muda |
-| `first_optimal_generation` | 1ª geração que atinge o ótimo da busca exaustiva |
-| `generations_to_optimum` | gerações até o ótimo (contagem 1‑based) |
-| `final_best_panels` | melhor valor final |
-| `stability_end_count` | tamanho da cauda estável |
-
-Resultados observados (5 cenários × 3 seeds × 2 configurações = 30 execuções):
-
-- **Taxa de convergência: 100 %** em todas as configurações.
-- **Taxa de ótimo: 100 %** — o AG igualou a busca exaustiva em todos os casos.
-- `pop=20`/`gens=40`: ótimo já na 1ª geração na maioria dos cenários (média 1,0–1,7 gerações).
-- `pop=10`/`gens=20`: ainda 100 % de ótimo; pior caso foi a seed 999 no cenário
-  `viavel_simples`, que precisou de 14 gerações (trajetória `14→…→4`).
-- Cenários com restrição ativa (`limite_area`, `orcamento_parcial`) convergem
-  imediatamente, pois o ótimo é ditado pela restrição.
-
-**Recomendação:** manter os parâmetros atuais. `pop=10`/`gens=20` é suficiente e
-mais rápido, mas `pop=20`/`gens=40` oferece margem de segurança sem custo
-relevante. Nenhum ajuste de taxa de crossover/mutação mostrou‑se necessário.
-
-### Sensibilidade (E5.4.4)
-
-Novas rotinas em `src/simulation/experiments.py` varrem, via AG v2:
-
-- `run_population_sensitivity`
-- `run_generations_sensitivity`
-- `run_mutation_rate_sensitivity`
-- `run_crossover_rate_sensitivity`
-- `run_elitism_sensitivity`
-
-Execução:
-
-```bash
-python sensitivity_experiment.py
-```
-
-Resultados (3 cenários × 5 varrimentos):
-
-| Parâmetro | Faixa testada | Efeito no ótimo | Efeito no tempo |
-|---|---|---|---|
-| População | 5–80 | pop=5 fica a 1 gap do ótimo (3 vs 4); pop≥10 é ótimo | ~5→78 ms |
-| Gerações | 5–80 | nenhuma variação | ~2→38 ms |
-| Mutação | 0.0–0.6 | nenhuma variação | ≈18 ms (constante) |
-| Crossover | 0.0–1.0 | nenhuma variação | ~17.6→18.4 ms |
-| Elitismo | 0–10 | nenhuma variação | ~17→18 ms |
-
-**Recomendação:** manter `pop≥10`, `gens=20–40`, `mutation=0.2`, `crossover=0.8`, `elitism=2`.
-Mesmo `elitism=0` e `mutation=0.0` mantêm o ótimo neste problema (paisagem quase unimodal),
-mas a configuração atual oferece margem de segurança a custo negligível (~18 ms).
-
-### Benchmark (E5.4.5)
-
-O benchmark em `src/simulation/benchmark.py` compara **analítico**, **exaustivo**
-e **AG v2** com metodologia consistente:
-
-- mesma instância de `Problem` para os três métodos;
-- warmup não medido antes das repetições;
-- `R` repetições medidas com `time.perf_counter`;
-- AG usa sementes `random_seed + rep` (reprodutibilidade);
-- estatística principal: mediana; também reporta média, desvio, mínimo e máximo;
-- qualidade: painéis, viabilidade, custo médio, energia média e taxa de
-  reprodução do ótimo da busca exaustiva.
-
-Execução:
-
-```bash
-python benchmark_experiment.py
-```
-
-Resultados (3 cenários × 5 repetições, `pop=20`, `gens=40`):
-
-| Método | Tempo mediano | Qualidade |
+| Ferramenta | Versão recomendada | Como verificar |
 |---|---|---|
-| Analítico | ~0,02–0,03 ms | 100 % do ótimo |
-| Exaustivo | ~0,02–0,36 ms | 100 % do ótimo |
-| AG v2 | ~14–19 ms | 100 % do ótimo |
+| **Python** | 3.11 ou 3.12 | `python --version` |
+| **Node.js** | 20 LTS ou superior | `node --version` |
+| **npm** | vem com o Node | `npm --version` |
+| **Git** | qualquer versão recente | `git --version` |
 
-O AG foi cerca de **50–800× mais lento** que os métodos determinísticos, mas
-entregou a mesma solução ótima em todas as repetições. O custo do AG é
-justificado pela flexibilidade da metaheurística; para este espaço de busca
-pequeno, analítico/exaustivo são preferíveis em produção.
+No Windows, durante a instalação do Python, marque a opção **“Add python.exe to PATH”**.
 
-### Status de implementações (E5.2 – E5.4)
+---
 
-- **E5.2** – Modelo matemático consolidado em `src/simulation/evaluation.py` (`EvaluationResult`, `evaluate_candidate`, `compare_lexicographic`).
-- **E5.3.2** – Solução analítica e busca exaustiva em `src/simulation/solvers.py`.
-- **E5.3.3.1 / E5.3.3.2 / E5.3.3.3** – Indivíduos, torneio e elitismo com comparador oficial em `src/genetic/*`.
-- **E5.3.4** – Fluxo experimental comum em `src/simulation/runner.py` (`run_comparison`).
-- **E5.4.1** – Documentação do fluxo experimental adicionada ao `README.md`.
-- **E5.4.2** – Validação experimental (todos os cenários confirmam consistência entre métodos e seeds).
-- **E5.4.3** – Análise de convergência em `src/simulation/convergence.py` e `tests/test_convergence.py`. Todas as execuções convergiram (100 %); as taxas de ótimo também foram 100 % com as configurações testadas (pop 10‑20, gens 20‑40). Recomenda‑se manter os parâmetros atuais; configurações ainda menores ainda convergem rapidamente.
-- **E5.4.4** – Sensibilidade a hiperparâmetros em `src/simulation/experiments.py` e `sensitivity_experiment.py`. População ≥10, gerações ≥5, mutação/crossover/elitismo nas faixas testadas mantêm 100 % de ótimo.
-- **E5.4.5** – Benchmark de tempo e qualidade em `src/simulation/benchmark.py` e `benchmark_experiment.py`. Comparação consistente (warmup + repetições) confirma que AG iguala o ótimo, embora seja 50–800× mais lento que analítico/exaustivo.
-- **E5.4.6** – Consolidação experimental em `scripts/e5_4_6_consolidacao.py` e `results/e5_4_6/`. 30 seeds por configuração nos cenários baixo/médio/alto; IC 95% e dados brutos registrados.
-- **E5.4.7** – Auditoria científica em `docs/E5_4_7_AUDITORIA_CIENTIFICA.md`. Fórmulas/unidades consistentes; irradiância é mock e deve ser declarada como limitação.
-- **E5.4.8** – Revisão de escopo em `docs/E5_4_8_REVISAO_ESCOPO.md`. Decisão oficial: **Alternativa A** — preservar o modelo E5.2 (minimizar custo com cobertura energética mensal); o objetivo geral e os objetivos específicos do artigo devem ser reescritos para refletir esse modelo. A divergência entre o objetivo original (`Eg − Ct`) e o modelo implementado está registrada para revisão do texto.
-- **E5.5** – Endpoint `/compare` em `backend/routes.py` + `backend/services.py` (`comparison_adapter`), expondo `run_comparison` sem alterar `/optimize` nem `/baseline`.
-- **E5.5.1** – Históricos de convergência por seed incluídos na resposta de `/compare` (`histories`, `list[dict]`). A `ComparisonPage` exibe todos os resultados, estatísticas de tempo e gráficos de convergência/histograma com dados reais da API.
-- **E5.5.2** – Aprimoramento visual: médias ± desvio‑padrão, mediana + IQR, tratamento de tempos iguais, legenda interativa (ocultar/destacar seeds), rótulos explícitos e acessibilidade nos gráficos.
-- **E5.5.3** – Validação de backend concluída: 208 testes aprovados, 6 cidades × 3 consumos, configurações de AG, entradas inválidas e retrocompatibilidade com `/optimize` e `/baseline`. Frontend: `npm ci` + `npm run build` executados com sucesso (`dist/` gerado sem erros TypeScript).
-- **E5.5.4** – Documentação final: `CHANGELOG.md` criado, `README.md` atualizado com contrato completo de `/compare`, exemplos JSON e instruções de execução do backend e frontend; OpenAPI/Swagger em `/docs` validado.
+## 5. Passo a passo para executar (Windows)
 
-### Protótipo original em Streamlit (legado)
+### 5.1 Clonar o repositório
 
-Mantido apenas como referência histórica. O sistema em produção usa FastAPI + React/Vite (ver seções abaixo).
+Abra o **PowerShell** e execute:
 
-```bash
-pip install -r requirements.txt
-streamlit run app.py
+```powershell
+git clone https://github.com/allanMeireles1/tcc-algoritmo-genetico-fotovoltaico.git
+cd tcc-algoritmo-genetico-fotovoltaico
 ```
 
-### API FastAPI (backend)
+### 5.2 Iniciar o backend (terminal 1)
 
-```bash
+Ainda na pasta raiz do projeto:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 uvicorn backend.app:app --reload --port 8000
 ```
 
-A documentação interativa (Swagger) fica em `http://localhost:8000/docs`.
+Se aparecer erro de política de execução no PowerShell, rode uma vez:
 
-### Frontend React/Vite
-
-```bash
-cd frontend
-npm ci
-npm run build   # gera dist/ e faz checagem de tipos (tsc)
-npm run dev     # ambiente de desenvolvimento
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
 
-### Testes
+e ative a venv novamente.
 
-```bash
+**Teste o backend:** abra no navegador:
+
+```text
+http://localhost:8000/docs
+```
+
+Se a página do Swagger abrir, o backend está funcionando.
+
+### 5.3 Iniciar o frontend (terminal 2)
+
+Abra **outro terminal PowerShell**, entre na pasta do projeto e execute:
+
+```powershell
+cd tcc-algoritmo-genetico-fotovoltaico
+cd frontend
+npm ci
+npm run dev
+```
+
+Se `npm ci` falhar, use:
+
+```powershell
+npm install
+```
+
+**Abra o sistema no navegador:**
+
+```text
+http://localhost:5173
+```
+
+> Mantenha os **dois terminais abertos** enquanto estiver usando o sistema: um com o backend e outro com o frontend.
+
+---
+
+## 6. Como usar o sistema e tirar prints para o artigo
+
+### 6.1 Primeira simulação (Dashboard principal)
+
+1. Abra `http://localhost:5173`.
+2. Confira no topo se o indicador da API está **online**.
+3. Preencha os campos, por exemplo:
+
+| Campo | Valor sugerido |
+|---|---|
+| Largura do telhado | `8` m |
+| Comprimento do telhado | `10` m |
+| Consumo mensal | `300` kWh |
+| Cidade | `João Pessoa` |
+| Orçamento máximo | deixar em branco |
+| População | `20` |
+| Gerações | `40` |
+| Crossover | `0,8` |
+| Mutação | `0,2` |
+| Elitismo | `2` |
+| Seed | `42` |
+
+4. Clique em **Executar otimização**.
+5. Aguarde os cards e gráficos aparecerem.
+
+**Prints recomendados nesta tela:**
+- formulário de entrada preenchido;
+- cards com painéis recomendados, energia estimada, custo e ocupação;
+- gráfico de evolução das soluções ao longo das gerações;
+- gráfico de geração × consumo;
+- gráfico de ocupação do telhado.
+
+### 6.2 Aba “Análise do AG”
+
+Clique na aba **Análise do AG**.
+
+**Prints recomendados:**
+- comparação AG × método direto;
+- histograma da população final;
+- composição da avaliação (penalidades e termos).
+
+### 6.3 Aba “Experimentos”
+
+Clique na aba **Experimentos** e execute os experimentos.
+
+**Prints recomendados:**
+- sensibilidade ao consumo;
+- tempo de execução × população;
+- tempo de execução × gerações.
+
+### 6.4 Aba “Comparação”
+
+Clique na aba **Comparação**.
+
+**Prints recomendados:**
+- cards com tempos médios e desvio-padrão;
+- tabela com execuções analítico, exaustivo e AG;
+- gráfico de evolução por seed;
+- histograma dos tempos do AG.
+
+### 6.5 Print da API (opcional, mas útil)
+
+Abra:
+
+```text
+http://localhost:8000/docs
+```
+
+Tire um print da documentação interativa do FastAPI. Isso evidencia o backend e os endpoints.
+
+### 6.6 Dica para capturar a tela no Windows
+
+Use **Win + Shift + S** para recortar a área desejada. O print vai para a área de transferência; cole no Word, PowerPoint ou salve como PNG.
+
+> Para os prints do artigo, use os valores padrão da tela ou os valores sugeridos acima. Os números oficiais dos **180 experimentos** estão em `results/e5_4_6/summary.json` e podem ser citados no texto; não é necessário reproduzir os 180 no navegador.
+
+---
+
+## 7. Rodar os testes (opcional)
+
+Com a venv ativada, na raiz do projeto:
+
+```powershell
 pip install pytest pytest-cov
 pytest tests/ -v
 ```
 
-## Estrutura do backend
+A suíte contém **208 testes**. Para o artigo, o número relevante é **208/208 aprovados**.
 
-```text
-backend/
-├── __init__.py
-├── app.py        # instância FastAPI + CORS
-├── routes.py     # endpoints (sem lógica de negócio)
-├── services.py   # adaptadores que chamam src/* e retornam DTOs
-└── schemas.py    # modelos Pydantic (request/response)
-```
+---
 
-## Endpoints da API
+## 8. Endpoints principais da API
 
 | Método | Rota | Descrição |
-|--------|------|-----------|
-| `GET`  | `/health` | Verificação de saúde |
-| `GET`  | `/cities` | Lista cidades disponíveis |
-| `GET`  | `/panels` | Lista painéis configurados |
-| `POST` | `/optimize` | Executa otimização completa (AG) |
-| `POST` | `/baseline` | Calcula dimensionamento direto |
-| `POST` | `/compare` | AG v2 vs analítico vs exaustivo (mesmo `Problem`, multi-seed) |
+|---|---|---|
+| `GET` | `/health` | Verifica se a API está no ar |
+| `GET` | `/cities` | Lista cidades disponíveis |
+| `GET` | `/panels` | Lista painéis configurados |
+| `POST` | `/optimize` | Executa a otimização com AG |
+| `POST` | `/baseline` | Calcula o dimensionamento direto |
+| `POST` | `/compare` | Compara AG × analítico × exaustivo |
 | `POST` | `/experiments/sensitivity` | Sensibilidade ao consumo |
-| `POST` | `/experiments/population-timing` | Tempo × tamanho da população |
-| `POST` | `/experiments/generations-timing` | Tempo × número de gerações |
+| `POST` | `/experiments/population-timing` | Tempo × população |
+| `POST` | `/experiments/generations-timing` | Tempo × gerações |
 
-### Exemplo de requisição `/optimize`
+Documentação interativa: `http://localhost:8000/docs`.
 
-```json
-{
-  "roof": {
-    "width_m": 8.0,
-    "length_m": 10.0,
-    "monthly_consumption_kwh": 300.0,
-    "city": "João Pessoa",
-    "roof_type": "ceramic",
-    "max_budget_brl": null
-  },
-  "config": {
-    "population_size": 50,
-    "generations": 100,
-    "crossover_rate": 0.8,
-    "mutation_rate": 0.1,
-    "elitism_count": 2,
-    "random_seed": 42
-  },
-  "runs": 1
-}
+---
+
+## 9. Estrutura do projeto
+
+```text
+tcc-algoritmo-genetico-fotovoltaico/
+├── backend/                 # FastAPI (rotas, schemas, serviços)
+├── frontend/                # React + Vite + TypeScript
+│   └── src/components/      # Dashboard, Análise, Experimentos, Comparação
+├── src/
+│   ├── core/                # configurações e constantes
+│   ├── models/              # telhado, painel, indivíduo, resultado
+│   ├── genetic/             # AG v1 e AG v2 (lexicográfico)
+│   ├── simulation/          # avaliação, solvers, runner, benchmark
+│   ├── visualization/       # gráficos
+│   └── storage/             # carga de dados mock
+├── data/                    # cidades, painéis e cenários mock
+├── results/e5_4_6/          # resultados consolidados dos 180 experimentos
+├── tests/                   # suíte de testes (208 testes)
+├── docs/                    # auditoria, modelo matemático e guia editorial
+├── scripts/                 # consolidação experimental
+├── requirements.txt
+└── README.md
 ```
 
-A resposta espelha a estrutura `OptimizationOutcome` do protótipo original
-(`result`, `history`, `summary`, `final_population`, `fitness_breakdown`).
+---
 
-### Exemplo de requisição e resposta `/compare`
+## 10. Limitações e escopo
 
-`/compare` aceita os mesmos campos de `roof`, `config` e `runs` de `/optimize` (`runs` entre 1 e 100).
-Exemplo de requisição (mesma estrutura usada em `/optimize`):
+- Irradiação **simulada (mock)**: série mensal para João Pessoa; demais cidades usam média anual.
+- Modelo com **uma única variável de decisão inteira**: `N` (quantidade de módulos).
+- Custo simplificado de **R$ 1.350,00 por módulo** (R$ 1.100 + R$ 250).
+- Eficiência global de **0,82**.
+- Fator de aproveitamento da área de **0,85**.
+- Não modela baterias, inversor, layout detalhado, payback ou LCOE.
+- Resultados restritos aos cenários e parâmetros testados.
+- **Sem validação em instalações fotovoltaicas reais.**
 
-```json
-{
-  "roof": {
-    "width_m": 8.0,
-    "length_m": 10.0,
-    "monthly_consumption_kwh": 300.0,
-    "city": "João Pessoa",
-    "roof_type": "ceramic",
-    "max_budget_brl": null
-  },
-  "config": {
-    "population_size": 10,
-    "generations": 5,
-    "crossover_rate": 0.8,
-    "mutation_rate": 0.1,
-    "elitism_count": 2,
-    "random_seed": 42
-  },
-  "runs": 1
-}
-```
+Esses pontos devem constar nas limitações do artigo. Não afirmar que o AG é superior aos métodos exatos: nos experimentos, o AG encontrou o ótimo, mas os métodos determinísticos foram mais rápidos.
 
-A resposta usa `summary`, `results` e `histories` exatamente como no `ComparisonResponse`
-(`summary: dict`, `results: list[dict]`, `histories: list[dict]`). Trecho real da resposta
-acima (valores de tempo variam entre execuções):
+---
 
-```json
-{
-  "summary": {
-    "analytical_panels": 5,
-    "analytical_feasible": true,
-    "exhaustive_panels": 5,
-    "exhaustive_feasible": true,
-    "analytical_matches_exhaustive": true,
-    "genetic_panels_by_seed": { "42": 5 },
-    "genetic_feasible_by_seed": { "42": true },
-    "genetic_execution_time_mean_s": 0.001368,
-    "runs": 1,
-    "convergence": { "runs": 1, "converged_count": 0, "optimal_count": 1, "optimal_rate": 1.0, "generations_to_optimum_values": [3], "final_best_panels_unique": [5] }
-  },
-  "results": [
-    { "method": "analytical", "run_index": 0, "run_seed": null, "execution_time_s": 0.000054, "evaluation": { "num_panels": 5, "feasible": true, "cost": 6750.0 } },
-    { "method": "exhaustive",  "run_index": 0, "run_seed": null, "execution_time_s": 0.000368, "evaluation": { "num_panels": 5, "feasible": true, "cost": 6750.0 } },
-    { "method": "genetic",     "run_index": 0, "run_seed": 42,   "execution_time_s": 0.001368, "evaluation": { "num_panels": 5, "feasible": true, "cost": 6750.0 } }
-  ],
-  "histories": [
-    { "seed": 42, "generations": [ { "generation": 0, "best_fitness": -9450.0, "avg_fitness": -13770.0, "best_panels": 7 } ] }
-  ]
-}
-```
+## 11. Documentação de apoio
 
-- `summary`: dicionário com as métricas agregadas (incluindo `convergence`).
-- `results`: lista de dicionários — 2 determinísticos (`analytical`, `exhaustive`) + N genéticos (`genetic`, uma linha por seed); cada linha traz `method`, `run_index`, `run_seed`, `execution_time_s` e `evaluation`.
-- `histories`: lista de dicionários — uma entrada por seed com `seed` e `generations`; cada geração tem `generation` (começa em **0**), `best_fitness`, `avg_fitness` e `best_panels`.
-- A ordem em `results` é sempre: analítico, exaustivo e depois os genéticos na ordem das seeds.
+| Documento | Conteúdo |
+|---|---|
+| `docs/E5_2_MODELO_MATEMATICO.md` | Modelo matemático oficial (E5.2) |
+| `docs/E6_1_AUDITORIA_COMPARATIVA.md` | Matriz de divergências do artigo |
+| `docs/E6_2_ENCERRAMENTO_TECNICO.md` | Encerramento técnico, limitações e trabalhos futuros |
+| `docs/E6_3_AUDITORIA_ARTIGO.md` | Auditoria completa do artigo (seções 1–6 e referências) |
+| `docs/GUIA_EDITORIAL_CONSOLIDADO_ARTIGO.md` | Guia operacional para a redação da versão final |
+| `results/e5_4_6/summary.json` | Resultados consolidados dos 180 experimentos |
 
-A aba **Comparação** do frontend consome esses três campos e exibe:
-- cards com média ± desvio‑padrão e mediana + IQR dos tempos;
-- tabela com todas as execuções;
-- gráfico de convergência (painéis por geração, linha por seed);
-- histograma de distribuição dos tempos do AG.
+---
 
-## O que a interface permite
+## 12. Solução de problemas
 
-- informar dimensões do telhado;
-- informar consumo mensal;
-- escolher cidade (irradiância mock);
-- definir orçamento máximo opcional;
-- configurar seed e parâmetros do AG;
-- comparar AG com baseline direto;
-- exportar resultados em JSON/CSV.
+| Problema | Solução |
+|---|---|
+| `python` não é reconhecido | Reinstale o Python marcando “Add python.exe to PATH” |
+| `Activate.ps1 cannot be loaded` | `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` |
+| `npm` não é reconhecido | Instale o Node.js LTS e reabra o terminal |
+| `npm ci` falha | Use `npm install` |
+| Página abre, mas a API aparece offline | Verifique se o backend está rodando em `http://localhost:8000` |
+| Erro de CORS | Use o frontend em `http://localhost:5173` e o backend em `http://localhost:8000` |
+| Porta 8000 ocupada | `uvicorn backend.app:app --reload --port 8001` (e ajuste o proxy, se necessário) |
+| Porta 5173 ocupada | O Vite escolhe outra porta; confira a mensagem no terminal |
+| `streamlit` não encontrado | O Streamlit é legado; use FastAPI + React/Vite |
 
-## Gráficos acadêmicos (abas)
+---
 
-**Dashboard principal**
+## 13. Observação sobre o protótipo antigo em Streamlit
 
-1. Evolução do fitness (convergência)
-2. Melhor fitness vs fitness médio
-3. Energia gerada × consumo
-4. Ocupação do telhado (m²) + layout esquemático
+O arquivo `app.py` e a dependência `streamlit` são mantidos apenas como **referência histórica**. A versão final do produto usa **FastAPI + React/Vite**. Para o artigo, a descrição correta é a arquitetura atual, não o Streamlit.
 
-**Análise do AG**
+---
 
-5. AG × método direto (painéis e custo)
-6. Histograma da população final
-7. Composição da função de fitness
+## 14. Licença e uso
 
-**Experimentos**
-
-8. Sensibilidade ao consumo
-9. Tempo de execução × população / gerações
-
-**Comparação (E5.5)**
-
-10. Convergência por seed (painéis por geração)
-11. Histograma dos tempos do AG (ms)
-12. Cards + tabela com as execuções analítico / exaustiva / AG
-
-## Dados mockados
-
-- `data/cities_mock.json`: cidades do Nordeste + irradiância média;
-- `data/panels_mock.json`: painel padrão com potência, área, custo e eficiência;
-- `data/scenarios_mock.json`: presets opcionais de demonstração.
-
-## Saídas em `results/run_<timestamp>/`
-
-- `result.json` (resumo da melhor solução);
-- `history.csv` (histórico por geração);
-- `execution_params.csv` (parâmetros do AG);
-- `execution_summary.json` (métricas agregadas);
-- `summary.csv` (resumo tabular final).
-
-## Conceitos de AG usados
-
-- cromossomo inteiro (`num_panels`);
-- seleção por torneio;
-- crossover aritmético;
-- mutação local;
-- elitismo;
-- fitness com penalidades de custo, déficit, excesso e orçamento (fluxo legado `/optimize`);
-- comparação lexicográfica *feasibility-first* (fluxo experimental `/compare`, E5.5).
-
-## Limitações e escopo
-
-- não modela baterias, VPL/LCOE ou orientação/inclinação avançada;
-- não usa API externa;
-- não usa biblioteca pronta de computação evolutiva.
-
-Essas extensões ficam para trabalhos futuros.
+Projeto acadêmico desenvolvido para fins de TCC. Não é um produto comercial de dimensionamento fotovoltaico. Para uso real, consulte um engenheiro ou profissional habilitado.
