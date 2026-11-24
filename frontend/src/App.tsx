@@ -59,15 +59,39 @@ export function App() {
   const [apiOnline, setApiOnline] = useState<boolean | null>(null);
 
   useEffect(() => {
-    getCities()
-      .then(setCities)
-      .catch(() => setCities([]));
-    getPanels()
-      .then(setPanels)
-      .catch(() => setPanels([]));
-    getHealth()
-      .then(() => setApiOnline(true))
-      .catch(() => setApiOnline(false));
+    let cancelled = false;
+    let cataloguesLoaded = false;
+
+    const checkApi = async () => {
+      try {
+        await getHealth();
+        if (cancelled) return;
+        setApiOnline(true);
+        // Busca os catalogos apenas uma vez, quando a API finalmente responde.
+        if (!cataloguesLoaded) {
+          cataloguesLoaded = true;
+          getCities()
+            .then((c) => {
+              if (!cancelled) setCities(c);
+            })
+            .catch(() => undefined);
+          getPanels()
+            .then((p) => {
+              if (!cancelled) setPanels(p);
+            })
+            .catch(() => undefined);
+        }
+      } catch {
+        if (!cancelled) setApiOnline(false);
+      }
+    };
+
+    checkApi();
+    const interval = setInterval(checkApi, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   // inputs ---------------------------------------------------------------
